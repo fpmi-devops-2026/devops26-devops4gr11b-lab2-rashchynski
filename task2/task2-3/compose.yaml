@@ -1,0 +1,45 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq_system
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./rabbitmq/data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  producer:
+    build: ./producer
+    container_name: producer_service
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./producer/storage:/app/storage
+
+  consumer:
+    build: ./consumer
+    environment:
+      - PYTHONUNBUFFERED=1
+    container_name: consumer_service
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./consumer/storage:/app/storage
+
+  ai_agent:
+    build: ./ai_agent
+    container_name: ai_agent_service
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./consumer/storage:/app/storage
