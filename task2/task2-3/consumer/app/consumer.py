@@ -1,30 +1,46 @@
-import time, json, os, pika
+import os
+import time
+import pika
 
-RABBITMQ_HOST = os.getenv('RABBITMQ_HOST', 'rabbitmq')
-STORAGE_PATH = '/app/storage/results.txt'
+def main():
+    rabbitmq_host = os.environ.get('RABBITMQ_HOST', 'rabbitmq')
+    storage_path = '/app/storage/results.txt'
 
-def callback(ch, method, properties, body):
-    data = json.loads(body.decode())
-    print(f" [Consumer] Processing task_id={data['task_id']}")
-    
-    os.makedirs(os.path.dirname(STORAGE_PATH), exist_ok=True)
-    with open(STORAGE_PATH, 'a') as f:
-        f.write(f"Processed task #{data['task_id']}: {data['payload']}\n")
-    
-    time.sleep(1)
-    ch.basic_ack(delivery_tag=method.delivery_tag)
+    os.makedirs(os.path.dirname(storage_path), exist_ok=True)
 
-def run():
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
+    connection = None
+    while not connection:
+        try:
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(host=rabbitmq_host, connection_attempts=5, retry_delay=3)
+            )
+        except Exception as e:
+            print(f"Waiting for RabbitMQ at {rabbitmq_host}... Error: {e}")
+            time.sleep(3)
+
     channel = connection.channel()
-
     channel.queue_declare(queue='task_queue', durable=True)
+
+    print(' [*] Consumer waiting for messages...')
+
+    def callback(ch, method, properties, body):
+        message_text = body.decode()
+        print(f" [x] Received: '{message_text}'")
+        
+        # Запись в файл на локальном монтируемом диске (bind mount)
+        with open(storage_path, 'a', encoding='utf-8') as f:
+            f.write(f"{message_text}\n")
+            
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
     channel.basic_qos(prefetch_count=1)
     channel.basic_consume(queue='task_queue', on_message_callback=callback)
 
-    print(' [Consumer] Waiting for messages...')
-    channel.start_consuming()
+    try:
+        channel.start_consuming()
+    except KeyboardInterrupt:
+        print("Stopping Consumer...")
+        connection.close()
 
 if __name__ == '__main__':
-    time.sleep(5)
-    run()
+    main()

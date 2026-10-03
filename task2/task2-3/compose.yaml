@@ -1,32 +1,37 @@
 services:
   rabbitmq:
     image: rabbitmq:3-management
-    container_name: rabbitmq_system
+    container_name: rabbitmq_task2_3
     ports:
       - "5672:5672"
       - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     volumes:
       - ./rabbitmq/data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
-      timeout: 10s
+      timeout: 5s
       retries: 5
 
   producer:
     build: ./producer
-    container_name: producer_service
+    container_name: producer_task2_3
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+    volumes:
+      - ./producer/storage:/app/storage
     depends_on:
       rabbitmq:
         condition: service_healthy
-    volumes:
-      - ./producer/storage:/app/storage
 
   consumer:
     build: ./consumer
     environment:
       - PYTHONUNBUFFERED=1
-    container_name: consumer_service
+    container_name: consumer_task2_3
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -35,11 +40,9 @@ services:
 
   ai_agent:
     build: ./ai_agent
-    container_name: ai_agent_service
+    container_name: ai_agent_task2_3
     environment:
-      - PYTHONUNBUFFERED=1
+      - RABBITMQ_HOST=rabbitmq
     depends_on:
       rabbitmq:
         condition: service_healthy
-    volumes:
-      - ./consumer/storage:/app/storage
