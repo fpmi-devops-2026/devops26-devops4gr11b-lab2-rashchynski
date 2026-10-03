@@ -199,3 +199,108 @@ curl http://localhost:3000/read
 ```
 
 ---
+
+## Упражнение 2.2. Локальное развертывание RabbitMQ и паттерны обмена сообщениями
+
+### Описание задачи
+
+Запуск брокера RabbitMQ в Docker-контейнере (`rabbitmq:3-management`) и практическое исследование паттернов обмена сообщениями на Python (библиотека `pika`).
+
+Проверка статуса локального брокера RabbitMQ
+
+```
+docker compose up -d
+```
+
+```
+[+] up 2/2
+ ✔ Network task2-2_default    Created                                                     0.0s
+ ✔ Container rabbitmq_local Started                                                     0.1s
+
+nazar@MacBook-Air-Nazar task2-2 % docker compose ps
+NAME             IMAGE                   COMMAND                 SERVICE    CREATED         STATUS                   PORTS
+rabbitmq_local   rabbitmq:3-management   "docker-entrypoint.s…"   rabbitmq   7 seconds ago   Up 6 seconds (healthy)   0.0.0.0:5672->5672/tcp, [::]:5672->5672/tcp, 0.0.0.0:15672->15672/tcp, [::]:15672->15672/tcp
+```
+
+### Tutorial 1: Hello World (Point-to-Point)
+
+Терминал 1 (Получатель receive.py):
+
+```
+nazar@MacBook-Air-Nazar task2-2 % python3 tutorial_1/receive.py
+ [*] Waiting for messages. To exit press CTRL+C
+ [x] Received Hello World!
+```
+
+Терминал 2 (Отправитель send.py):
+
+```
+nazar@MacBook-Air-Nazar task2-2 % python3 tutorial_1/send.py
+ [x] Sent 'Hello World!'
+```
+
+### Tutorial 2: Work Queues (Распределение задач)
+
+Терминал 1 (Отправитель new_task.py):
+
+```
+nazar@MacBook-Air-Nazar task2-2 % python3 tutorial_2/new_task.py First task.
+ [x] Sent First task.
+nazar@MacBook-Air-Nazar task2-2 % python3 tutorial_2/new_task.py Second task..
+ [x] Sent Second task..
+nazar@MacBook-Air-Nazar task2-2 % python3 tutorial_2/new_task.py Third task...
+ [x] Sent Third task...
+nazar@MacBook-Air-Nazar task2-2 % python3 tutorial_2/new_task.py Fourth task....
+ [x] Sent Fourth task....
+```
+
+Терминал 2 (Воркер 1 worker.py):
+
+```
+nazar@MacBook-Air-Nazar task2-2 % python3 tutorial_2/worker.py
+ [*] Waiting for messages. To exit press CTRL+C
+ [x] Received First task.
+ [x] Done
+ [x] Received Third task...
+ [x] Done
+```
+
+Терминал 3 (Воркер 2 worker.py):
+
+```
+nazar@MacBook-Air-Nazar task2-2 % python3 tutorial_2/worker.py
+ [*] Waiting for messages. To exit press CTRL+C
+ [x] Received Second task..
+ [x] Done
+ [x] Received Fourth task....
+ [x] Done
+```
+
+Вывод: Задачи 1 и 3 ушли первому воркеру, а задачи 2 и 4 — второму. Нагрузка распределилась равномерно.
+
+### Tutorial 3: Publish/Subscribe (Веерная рассылка)
+
+Терминал 1 (Издатель emit_log.py):
+
+```
+nazar@MacBook-Air-Nazar task2-2 % python3 tutorial_3/emit_log.py "Broadcast test log"
+ [x] Sent Broadcast test log
+```
+
+Терминал 2 (Подписчик 1 receive_logs.py):
+
+```
+nazar@MacBook-Air-Nazar task2-2 % python3 tutorial_3/receive_logs.py
+ [*] Waiting for logs. To exit press CTRL+C
+ [x] Broadcast test log
+```
+
+Терминал 3 (Подписчик 2 receive_logs.py):
+
+```
+nazar@MacBook-Air-Nazar task2-2 % python3 tutorial_3/receive_logs.py
+ [*] Waiting for logs. To exit press CTRL+C
+ [x] Broadcast test log
+```
+
+Вывод: Сообщение Broadcast test log было одновременно доставлено обоим активным подписчикам.
