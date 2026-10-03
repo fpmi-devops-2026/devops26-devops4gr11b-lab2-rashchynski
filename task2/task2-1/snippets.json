@@ -1,0 +1,23 @@
+{
+  "exchange": {
+    "name": "test_exchange",
+    "type": "direct",
+    "durable": true
+  },
+  "queue": {
+    "name": "test_queue",
+    "durable": true
+  },
+  "binding": {
+    "source": "test_exchange",
+    "destination": "test_queue",
+    "routing_key": "test_key"
+  },
+  "published_message": {
+    "routing_key": "test_key",
+    "payload": {
+      "message": "Hello from CloudAMQP!",
+      "status": "ok"
+    }
+  }
+}
